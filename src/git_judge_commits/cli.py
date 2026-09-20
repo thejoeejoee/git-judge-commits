@@ -577,11 +577,14 @@ def judge(
         print(render_json(verdicts))
     else:
         write_table(out, build_table(verdicts, verbose))
-        sys.stdout.flush()  # keep anything that follows in the right order under `2>&1 |`
         if verbose >= 2:
             print_detail(err, verdicts, verbose)
-        err.print()
-        err.print(summarise(verdicts, verbose))
+
+    # stdout carries the result, stderr what happened -- so the summary belongs
+    # here either way. It is the only place the cache reports what it saved.
+    sys.stdout.flush()  # keep what follows in the right order under `2>&1 |`
+    err.print()
+    err.print(summarise(verdicts, verbose))
 
     if tripped := gate.evaluate(conditions, verdicts):
         alarm.print()

@@ -220,6 +220,11 @@ adds, **comments the verdict on the pull request**, writes the same table to the
 summary, and fails the step if anything matches `fail-on` — leave that empty to report
 without ever going red.
 
+Verdicts are cached between runs, so a push only pays for the commits it added — the
+cache restores from an earlier run on the same branch, or failing that from the base
+branch's. Re-running a job that has not moved costs nothing at all. Set `cache: false`
+to turn it off.
+
 The comment is edited in place on every push rather than added to, so a busy branch does
 not bury its own review under a stack of them. Set `comment: false` to turn it off, or
 `comment-key` to tell two runs of the action apart. Without `pull-requests: write` the
@@ -247,6 +252,7 @@ its history in a depth-1 clone.
 | `exclude` | *none* | Pathspecs to drop, comma- or newline-separated |
 | `version` | newest | Which release to run |
 | `source` | PyPI | Install from a path or git URL instead |
+| `cache` | `true` | Carry the verdict cache between runs |
 | `summary` | `true` | Write the job summary |
 | `comment` | `true` | Post/edit the verdict as a PR comment |
 | `comment-key` | `default` | Distinguishes two runs of the action on one PR |

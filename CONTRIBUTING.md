@@ -23,7 +23,7 @@ here needs anything newer.
 | `cache.py` | Verdict cache and its key |
 | `forge.py` | Pull/merge request URLs: parsing, fetching, and finding the base |
 | `gate.py` | `--fail-on` conditions |
-| `action.yml`, `scripts/report.py` | The GitHub Action and its job summary |
+| `action.yml`, `scripts/report.py` | The GitHub Action, its comment and job summary |
 
 ## Changing the questions
 

@@ -59,6 +59,13 @@ inputs:
       trying an unreleased change.
     required: false
     default: ""
+  cache:
+    description: >-
+      Carry the verdict cache between runs, so a push only pays for the commits
+      it added. Restores from an earlier run on this branch, or from the base
+      branch's.
+    required: false
+    default: "true"
   summary:
     description: Write the verdicts to the job summary.
     required: false
@@ -110,11 +117,24 @@ runs:
       with:
         enable-cache: true
 
+    # Every commit in the range is re-judged on every push otherwise, including
+    # the ones that have not moved. The exact key hits when a run is repeated on
+    # the same commit and nothing is written back; a new push falls through to
+    # the prefix, reuses what it can, and saves the rest.
+    - if: ${{ inputs.cache == 'true' }}
+      uses: actions/cache@v6
+      with:
+        path: ${{ github.workspace }}/.git-judge-commits-cache
+        key: git-judge-commits-v1-${{ github.sha }}
+        restore-keys: |
+          git-judge-commits-v1-
+
     - id: judge
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        GIT_JUDGE_COMMITS_CACHE: ${{ github.workspace }}/.git-judge-commits-cache
         # `gh pr view` supplies the base commit for a pull request URL, and the
         # fetch of a private repository's refs needs it too.
         GH_TOKEN: ${{ github.token }}
@@ -162,7 +182,7 @@ runs:
         echo "json=$json" >> "$GITHUB_OUTPUT"
 
         echo "::group::git-judge-commits ${args[*]}"
-        uvx --from "$package" git-judge-commits "${args[@]}" --json > "$json"
+        uvx --from "$package" git-judge-commits "${args[@]}" --verbose --json > "$json"
         status=$?
         echo "::endgroup::"
 
