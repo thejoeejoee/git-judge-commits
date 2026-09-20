@@ -44,7 +44,9 @@ def cell(record: dict, field: str, text: str) -> str:
 def table(records: list[dict]) -> list[str]:
     rows = ["| commit | type | compat | attention | concern | message | subject |",
             "| --- | --- | --- | --- | --- | --- | --- |"]
-    for r in records:
+    # git log hands them back newest first, which is right in a terminal. The
+    # Commits tab of a pull request reads oldest first, and this sits next to it.
+    for r in reversed(records):
         if "error" in r:
             rows.append(f"| {commit_link(r['sha'])} | ❌ | | | | | {r['error']} |")
             continue
@@ -61,6 +63,37 @@ def table(records: list[dict]) -> list[str]:
             )
         )
     return rows
+
+
+def thousands(number: int) -> str:
+    return f"{number:,}"
+
+
+def footnote(records: list[dict]) -> str:
+    """The provenance line: which model, what it cost, and what `?` means."""
+    judged = [r for r in records if "error" not in r]
+    model = next((r["model"] for r in judged if r.get("model")), None)
+    spent = sum(r.get("input_tokens", 0) for r in judged if not r.get("cached"))
+    saved = sum(r.get("input_tokens", 0) for r in judged if r.get("cached"))
+    slowest = max((r.get("elapsed_ms", 0) for r in judged if not r.get("cached")), default=0)
+
+    facts = [f"**{len(judged)}** commit{'' if len(judged) == 1 else 's'}"]
+    if model:
+        facts.append(f"`{model}`")
+    if spent or not saved:
+        facts.append(f"{thousands(spent)} input tokens")
+    if saved:
+        facts.append(f"{thousands(saved)} saved by cache")
+    if slowest:
+        facts.append(f"slowest {slowest / 1000:.1f}s")
+
+    return (
+        "<sub>Judged by [Jev](https://typesafe.ai), which answers typed questions with "
+        "calibrated probabilities and never writes text — so <code>?</code> means the "
+        "answer was too close to the threshold to assert, not that it was skipped.<br>"
+        + " · ".join(facts)
+        + "</sub>"
+    )
 
 
 def main() -> int:
@@ -99,8 +132,7 @@ def main() -> int:
     verdict = "🚩 some commits need another look" if status == EXIT_GATE else "✅ nothing flagged"
     body = [f"## ⚖️ git-judge-commits", "", f"**{verdict}** — {headline}", ""]
     body += table(records) if records else ["_No commits in range._"]
-    body += ["", "<sub>Judged by [Jev](https://typesafe.ai), which answers typed questions with "
-             "calibrated probabilities. `?` means the answer was too close to call.</sub>"]
+    body += ["", footnote(records)]
     markdown = "\n".join(body) + "\n"
 
     if os.environ.get("SUMMARY", "true").lower() == "true" and (summary := os.environ.get("GITHUB_STEP_SUMMARY")):

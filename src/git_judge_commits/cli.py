@@ -347,6 +347,9 @@ def render_json(verdicts: list[Verdict]) -> str:
                 "scores": v.scores,
                 "low_confidence": v.low_confidence,
                 "cached": v.cached,
+                "model": v.model_name,
+                "input_tokens": v.input_tokens,
+                "elapsed_ms": round(v.elapsed * 1000),
             }
         payload.append(entry)
     return json.dumps(payload, indent=2, ensure_ascii=False)
