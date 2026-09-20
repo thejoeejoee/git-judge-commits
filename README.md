@@ -203,15 +203,28 @@ fail-on concern=mixed matched 1:
 ## 🐙 GitHub Action
 
 ```yaml
-- uses: thejoeejoee/git-judge-commits@v0
-  with:
-    api-key: ${{ secrets.TYPESAFE_API_KEY }}
-    fail-on: message=nok,concern=mixed
+permissions:
+  contents: read
+  pull-requests: write   # so it can post its verdict
+
+steps:
+  - uses: actions/checkout@v7
+  - uses: thejoeejoee/git-judge-commits@v0
+    with:
+      api-key: ${{ secrets.TYPESAFE_API_KEY }}
+      fail-on: message=nok,concern=mixed
 ```
 
 That is the whole thing on a `pull_request` event. It judges the commits the request
-adds, writes them to the job summary as a table, and fails the step if anything matches
-`fail-on` — leave that empty to report without ever going red.
+adds, **comments the verdict on the pull request**, writes the same table to the job
+summary, and fails the step if anything matches `fail-on` — leave that empty to report
+without ever going red.
+
+The comment is edited in place on every push rather than added to, so a busy branch does
+not bury its own review under a stack of them. Set `comment: false` to turn it off, or
+`comment-key` to tell two runs of the action apart. Without `pull-requests: write` the
+step warns instead of failing — which is also what happens on a pull request from a fork,
+where GitHub never grants a writable token.
 
 **It works with the default `actions/checkout`.** On a pull request the action passes the
 request's *URL* rather than a revision range, so the tool fetches the refs it needs
@@ -235,6 +248,8 @@ its history in a depth-1 clone.
 | `version` | newest | Which release to run |
 | `source` | PyPI | Install from a path or git URL instead |
 | `summary` | `true` | Write the job summary |
+| `comment` | `true` | Post/edit the verdict as a PR comment |
+| `comment-key` | `default` | Distinguishes two runs of the action on one PR |
 | `working-directory` | `.` | Where to run |
 
 | Output | |
@@ -242,6 +257,7 @@ its history in a depth-1 clone.
 | `json` | Path to the verdicts as JSON |
 | `judged` `breaking` `mismatched` `mixed` | Counts, excluding answers too close to call |
 | `failed` | Whether a condition matched |
+| `comment` | Path to the markdown that was posted |
 
 </details>
 

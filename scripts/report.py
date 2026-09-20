@@ -78,14 +78,23 @@ def main() -> int:
     )
     print(headline)
 
+    verdict = "🚩 some commits need another look" if status == EXIT_GATE else "✅ nothing flagged"
+    body = [f"## ⚖️ git-judge-commits", "", f"**{verdict}** — {headline}", ""]
+    body += table(records) if records else ["_No commits in range._"]
+    body += ["", "<sub>Judged by [Jev](https://typesafe.ai), which answers typed questions with "
+             "calibrated probabilities. `?` means the answer was too close to call.</sub>"]
+    markdown = "\n".join(body) + "\n"
+
     if os.environ.get("SUMMARY", "true").lower() == "true" and (summary := os.environ.get("GITHUB_STEP_SUMMARY")):
-        verdict = "🚩 some commits need another look" if status == EXIT_GATE else "✅ nothing flagged"
-        lines = [f"## ⚖️ git-judge-commits", "", f"**{verdict}** — {headline}", ""]
-        lines += table(records) if records else ["_No commits in range._"]
-        lines += ["", "<sub>Judged by [Jev](https://typesafe.ai), which answers typed questions with "
-                  "calibrated probabilities. `?` means the answer was too close to call.</sub>"]
         with open(summary, "a") as handle:
-            handle.write("\n".join(lines) + "\n")
+            handle.write(markdown)
+
+    # Written whether or not it gets posted, so the next step only has to decide.
+    if temp := os.environ.get("RUNNER_TEMP"):
+        comment = Path(temp) / "git-judge-commits-comment.md"
+        comment.write_text(f"{os.environ.get('MARKER', '')}\n{markdown}")
+        with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
+            handle.write(f"comment={comment}\n")
 
     if status == EXIT_UNJUDGED:
         print("::warning::some commits could not be judged")

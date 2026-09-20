@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write  # the action edits its own comment
 
 concurrency:
   group: judge-${{ github.ref }}
