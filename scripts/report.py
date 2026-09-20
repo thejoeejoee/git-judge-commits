@@ -88,11 +88,8 @@ def footnote(records: list[dict]) -> str:
         facts.append(f"slowest {slowest / 1000:.1f}s")
 
     return (
-        "<sub>Judged by [Jev](https://typesafe.ai), which answers typed questions with "
-        "calibrated probabilities and never writes text — so <code>?</code> means the "
-        "answer was too close to the threshold to assert, not that it was skipped.<br>"
-        + " · ".join(facts)
-        + "</sub>"
+        "<sub>Judged by [Jev](https://typesafe.ai) — <code>?</code> means too close to "
+        "call.<br>" + " · ".join(facts) + "</sub>"
     )
 
 
