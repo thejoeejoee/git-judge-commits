@@ -1,0 +1,38 @@
+[project]
+name = "git-judge-commits"
+version = "0.1.0"
+description = "Judge git commits with Jev: is it breaking, does it deserve attention, and does its message tell the truth?"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Josef Kolář", email = "thejoeejoee@gmail.com" }
+]
+requires-python = ">=3.11"
+keywords = ["git", "commits", "code-review", "conventional-commits", "jev", "typesafe", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic-ai-slim[typesafe]>=2.46.0",
+    "python-dotenv>=1.0",
+    "typer>=0.15",
+]
+
+[project.urls]
+Homepage = "https://github.com/thejoeejoee/git-judge-commits"
+Repository = "https://github.com/thejoeejoee/git-judge-commits"
+Issues = "https://github.com/thejoeejoee/git-judge-commits/issues"
+
+[project.scripts]
+git-judge-commits = "git_judge_commits:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
