@@ -1,0 +1,77 @@
+name: release
+
+# One tag publishes the package to PyPI. Triggered by the tag release-please
+# pushes, or by hand against an existing tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing v* tag to publish
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: astral-sh/setup-uv@v10
+
+      - run: uv sync
+
+      - run: uv run git-judge-commits --help
+
+      # A tag that disagrees with pyproject.toml publishes a version nobody
+      # asked for, and PyPI will not let it be taken back.
+      - name: the tag and pyproject agree
+        id: version
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="$(uv run python -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::tag $tag does not match pyproject version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - run: uv build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+
+  pypi:
+    needs: verify
+    runs-on: ubuntu-latest
+    # Named in PyPI's trusted publisher for this project, which checks the claim
+    # matches. Renaming this job's environment, or this file, without changing it
+    # there stops publishing.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/git-judge-commits
+    permissions:
+      contents: read
+      # The whole of the credential. PyPI trades this OIDC token for a
+      # short-lived upload token, so there is no API token to leak or rotate.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
