@@ -149,7 +149,63 @@ behaviour and smuggles in an unrelated helper:
 `mismatch` says the message is not a truthful description of the diff, `mixed` says the
 commit does more than one thing, and `5 critical` says look at it before it ships.
 
-Exit code is 2 if git failed, 1 if any commit could not be judged, else 0.
+Exit codes are listed under [Failing a build](#-failing-a-build).
+
+## 🚦 Failing a build
+
+`--fail-on` turns verdicts into an exit code, so a pipeline can refuse a branch. Conditions
+read the way the table does:
+
+```bash
+git-judge-commits --fail-on=concern=mixed
+git-judge-commits --fail-on=compat=interface,message=nok
+git-judge-commits --fail-on='attention>=4'        # quote it: the shell eats >=
+git-judge-commits --fail-on='type=feat|fix' --fail-on=breaking
+```
+
+Comma separates conditions, `|` gives alternatives, and the flag is repeatable. Any commit
+matching any condition fails the run.
+
+| Field | Values | Ordered |
+| --- | --- | --- |
+| `compat` | `none` `internal` `behaviour` `interface` `data` | yes — least to most disruptive |
+| `attention` | `0`–`5`, or `none` `low` `moderate` `elevated` `high` `critical` | yes |
+| `type` | the eleven Conventional Commits types | no |
+| `concern` | `single` `mixed` | no |
+| `message` | `ok` `nok` | no |
+| `breaking` | `yes` `no` | no |
+
+Operators are `=`, `!=`, and on the ordered fields `>=`, `>`, `<=`, `<`. So
+`compat>=interface` is "interface or worse", which is the same set as `breaking`.
+Shorthands `breaking`, `mixed`, `mismatch` and `unsure` stand alone.
+
+**A suppressed answer never fails a build.** If a margin fell below `--min-confidence` the
+table shows `?`, and the gate skips it — failing a branch over a coin flip is worse than
+missing one. `--fail-on=unsure` is there for when you want the opposite: fail *because*
+something was too close to call.
+
+A tripped gate always says which condition matched and on which commits, even under `-s`:
+
+```
+fail-on concern=mixed matched 1:
+  1f13f045 fix: rewrite README and add golangci-lint workflow
+```
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Nothing matched |
+| `1` | A `--fail-on` condition matched |
+| `2` | Bad arguments, or git could not do what was asked |
+| `3` | One or more commits could not be judged |
+
+```yaml
+- name: no commit lies about itself
+  run: |
+    uvx git-judge-commits "origin/${{ github.base_ref }}..HEAD" \
+      --fail-on=message=nok,concern=mixed
+```
 
 ## 🎯 Confidence and the `?` gate
 
@@ -244,6 +300,7 @@ Everything above goes to **stderr**; stdout carries only the table or the JSON. 
 | `--no-cache` | off | Neither read nor write the cache |
 | `--refresh` | off | Re-judge and overwrite cached verdicts |
 | `--cache-dir PATH` | XDG | Where verdicts are cached |
+| `-f, --fail-on COND` | — | Exit 1 if any commit matches. Repeatable |
 | `--json` / `--no-color` | — | Output control |
 
 Run `git-judge-commits -h` for the full help.

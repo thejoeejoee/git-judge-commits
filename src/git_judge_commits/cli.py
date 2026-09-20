@@ -22,7 +22,7 @@ from rich.table import Table
 from rich.text import Text
 
 from .cache import Cache
-from . import forge
+from . import forge, gate
 from .git import Commit, GitError, plan, read_commits
 from .model import INSTRUCTIONS, Attention, CommitClassification, Compat
 
@@ -30,6 +30,12 @@ DEFAULT_LIMIT = 32
 DEFAULT_DIFF_BUDGET = 16_000
 DEFAULT_CONCURRENCY = 8
 DEFAULT_MIN_CONFIDENCE = 0.2
+
+# Exit codes. A gate that tripped and a commit that could not be judged are
+# different problems, and a pipeline may well want to treat them differently.
+EXIT_GATE = 1
+EXIT_ERROR = 2
+EXIT_UNJUDGED = 3
 
 QUESTIONS = ("compat", "worth_attention", "type", "single_concern", "message_matching")
 
@@ -437,6 +443,18 @@ def judge(
     ] = None,
     merges: Annotated[bool, typer.Option("--merges", help="Include merge commits, which otherwise have no diff to judge.")] = False,
     concurrency: Annotated[int, typer.Option("--concurrency", "-j", min=1, help="Commits judged in parallel.")] = DEFAULT_CONCURRENCY,
+    fail_on: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--fail-on",
+            "-f",
+            metavar="COND",
+            help="Exit [bold]1[/] if any commit matches, e.g. [green]concern=mixed[/], "
+            "[green]compat=interface,message=nok[/], [green]attention>=4[/], "
+            "[green]type=feat|fix[/]. Shorthands: [green]breaking[/], [green]mixed[/], "
+            "[green]mismatch[/], [green]unsure[/]. Repeatable.",
+        ),
+    ] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Neither read nor write the verdict cache.")] = False,
     refresh: Annotated[bool, typer.Option("--refresh", help="Re-judge everything and overwrite the cached verdicts.")] = False,
     cache_dir: Annotated[
@@ -472,10 +490,18 @@ def judge(
     if silent and verbose:
         raise typer.BadParameter("--silent and --verbose contradict each other")
 
+    try:  # fail before spending anything on a condition that cannot be met
+        conditions = gate.parse(fail_on or [])
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--fail-on") from None
+
     load_dotenv()  # TYPESAFE_API_KEY, if the caller keeps one in .env
     os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
     err = Console(stderr=True, no_color=no_color, quiet=silent)
+    # Why the command failed is never chrome: --silent hides the running
+    # commentary, not the reason a pipeline just went red.
+    alarm = Console(stderr=True, no_color=no_color)
     out = Console(no_color=no_color)
     if not out.is_terminal:
         out.width = 400  # piped or redirected: never truncate the subject
@@ -507,8 +533,8 @@ def judge(
             diff_budget=diff_budget,
         )
     except GitError as exc:
-        err.print(f"[bold red]error[/] {escape(str(exc))}")
-        raise typer.Exit(2) from None
+        alarm.print(f"[bold red]error[/] {escape(str(exc))}")
+        raise typer.Exit(EXIT_ERROR) from None
 
     if not commits:
         err.print(f"[yellow]no commits in[/] {escape(selection.description)}")
@@ -557,7 +583,15 @@ def judge(
         err.print()
         err.print(summarise(verdicts, verbose))
 
-    raise typer.Exit(1 if any(v.error for v in verdicts) else 0)
+    if tripped := gate.evaluate(conditions, verdicts):
+        alarm.print()
+        for condition, hits in tripped:
+            alarm.print(f"[bold red]fail-on[/] [bold]{escape(condition.source)}[/] matched {len(hits)}:")
+            for verdict in hits:
+                alarm.print(f"  [dim]{verdict.commit.short}[/] {escape(verdict.commit.subject)}")
+        raise typer.Exit(EXIT_GATE)
+
+    raise typer.Exit(EXIT_UNJUDGED if any(v.error for v in verdicts) else 0)
 
 
 def main() -> None:

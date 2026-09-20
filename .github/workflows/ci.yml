@@ -59,6 +59,23 @@ jobs:
           print("ok")
           PY
 
+      - name: fail-on conditions parse and evaluate
+        run: |
+          uv run --python ${{ matrix.python }} python - <<'PY'
+          from git_judge_commits.gate import Condition, parse
+          for good in ("concern=mixed", "compat=interface,message=nok", "attention>=4",
+                       "compat>=interface", "type=feat|fix", "breaking", "mismatch", "unsure"):
+              assert parse([good]), good
+          assert len(parse(["compat=interface,message=nok"])) == 2
+          for bad in ("nonsense", "compat=nope", "type>=feat", "attention>=9", "compat="):
+              try:
+                  parse([bad])
+              except ValueError:
+                  continue
+              raise AssertionError(f"{bad!r} should not parse")
+          print("ok")
+          PY
+
       - name: the questions still build a schema
         run: |
           uv run --python ${{ matrix.python }} python -c "
