@@ -4,50 +4,17 @@
   "include-v-in-tag": true,
   "include-component-in-tag": false,
   "packages": {
-    ".": {
-      "extra-files": [
-        "action.yml"
-      ]
-    }
+    ".": { "extra-files": ["action.yml"] }
   },
   "changelog-sections": [
-    {
-      "type": "feat",
-      "section": "Features"
-    },
-    {
-      "type": "fix",
-      "section": "Bug Fixes"
-    },
-    {
-      "type": "perf",
-      "section": "Performance"
-    },
-    {
-      "type": "refactor",
-      "section": "Code Refactoring"
-    },
-    {
-      "type": "docs",
-      "section": "Documentation"
-    },
-    {
-      "type": "test",
-      "section": "Tests"
-    },
-    {
-      "type": "build",
-      "section": "Build"
-    },
-    {
-      "type": "ci",
-      "section": "Continuous Integration",
-      "hidden": true
-    },
-    {
-      "type": "chore",
-      "section": "Miscellaneous",
-      "hidden": true
-    }
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Code Refactoring" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "test", "section": "Tests" },
+    { "type": "build", "section": "Build" },
+    { "type": "ci", "section": "Continuous Integration", "hidden": true },
+    { "type": "chore", "section": "Miscellaneous", "hidden": true }
   ]
 }
