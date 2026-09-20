@@ -22,6 +22,8 @@ here needs anything newer.
 | `cli.py` | Typer command, classification, rendering, verbosity |
 | `cache.py` | Verdict cache and its key |
 | `forge.py` | Pull/merge request URLs: parsing, fetching, and finding the base |
+| `gate.py` | `--fail-on` conditions |
+| `action.yml`, `scripts/report.py` | The GitHub Action and its job summary |
 
 ## Changing the questions
 

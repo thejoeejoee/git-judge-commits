@@ -1,0 +1,165 @@
+name: git-judge-commits
+description: Judge every commit in a range and check whether its message tells the truth about its diff.
+author: Josef Kolář
+
+branding:
+  icon: check-square
+  color: purple
+
+inputs:
+  api-key:
+    description: A TypeSafe API key. Store it as a secret and pass it here.
+    required: true
+  revisions:
+    description: >-
+      A revision range or a pull request URL. Left empty on a pull_request event
+      this becomes the request's own URL, which sidesteps the shallow checkout
+      actions/checkout does by default; elsewhere it judges the branch against
+      the default branch.
+    required: false
+    default: ""
+  fail-on:
+    description: >-
+      Conditions that fail the step, e.g. `message=nok,concern=mixed` or
+      `attention>=4`. Empty means report only, never fail.
+    required: false
+    default: ""
+  min-confidence:
+    description: Margin below which an answer is reported as unknown rather than asserted.
+    required: false
+    default: "0.2"
+  threshold:
+    description: Probability bar for a yes on the yes/no questions.
+    required: false
+    default: "0.5"
+  model:
+    description: Which Jev to ask. Pin a version once thresholds are tuned.
+    required: false
+    default: typesafe:jev-latest
+  limit:
+    description: Most commits to judge.
+    required: false
+    default: "32"
+  diff-budget:
+    description: Diff characters sent per commit, spread across its files.
+    required: false
+    default: "16000"
+  exclude:
+    description: Newline- or comma-separated pathspecs to drop from diffs, e.g. `*.lock`.
+    required: false
+    default: ""
+  version:
+    description: Which release of git-judge-commits to run. Empty means the newest.
+    required: false
+    default: ""
+  source:
+    description: >-
+      Install from here instead of PyPI: a checkout path, or a git URL such as
+      `git+https://github.com/thejoeejoee/git-judge-commits@main`. Mostly for
+      trying an unreleased change.
+    required: false
+    default: ""
+  summary:
+    description: Write the verdicts to the job summary.
+    required: false
+    default: "true"
+  working-directory:
+    description: Directory to run in.
+    required: false
+    default: "."
+
+outputs:
+  json:
+    description: Path to the verdicts as JSON.
+    value: ${{ steps.judge.outputs.json }}
+  judged:
+    description: How many commits were judged.
+    value: ${{ steps.report.outputs.judged }}
+  breaking:
+    description: How many put an interface or stored data at stake.
+    value: ${{ steps.report.outputs.breaking }}
+  mismatched:
+    description: How many have a message that does not describe the diff.
+    value: ${{ steps.report.outputs.mismatched }}
+  mixed:
+    description: How many do more than one thing.
+    value: ${{ steps.report.outputs.mixed }}
+  failed:
+    description: Whether a fail-on condition matched.
+    value: ${{ steps.report.outputs.failed }}
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v10.1.0
+      with:
+        enable-cache: true
+
+    - id: judge
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        # `gh pr view` supplies the base commit for a pull request URL, and the
+        # fetch of a private repository's refs needs it too.
+        GH_TOKEN: ${{ github.token }}
+        INPUT_REVISIONS: ${{ inputs.revisions }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_SOURCE: ${{ inputs.source }}
+        PR_URL: ${{ github.event.pull_request.html_url }}
+      run: |
+        set -uo pipefail
+
+        if [ -n "$INPUT_SOURCE" ]; then
+          package="$INPUT_SOURCE"
+        elif [ -n "$INPUT_VERSION" ]; then
+          package="git-judge-commits==${INPUT_VERSION#v}"
+        else
+          package="git-judge-commits"
+        fi
+
+        args=()
+        revisions="$INPUT_REVISIONS"
+        if [ -z "$revisions" ] && [ -n "${PR_URL:-}" ]; then
+          # The pull request's own URL: the tool fetches the refs it needs, so a
+          # depth-1 checkout is not a problem.
+          revisions="$PR_URL"
+        fi
+        [ -n "$revisions" ] && args+=("$revisions")
+
+        args+=(--limit "${{ inputs.limit }}")
+        args+=(--model "${{ inputs.model }}")
+        args+=(--threshold "${{ inputs.threshold }}")
+        args+=(--min-confidence "${{ inputs.min-confidence }}")
+        args+=(--diff-budget "${{ inputs.diff-budget }}")
+
+        while IFS= read -r pathspec; do
+          [ -n "$pathspec" ] && args+=(--exclude "$pathspec")
+        done <<< "$(printf '%s' "$INPUT_EXCLUDE" | tr ',' '\n')"
+
+        while IFS= read -r condition; do
+          [ -n "$condition" ] && args+=(--fail-on "$condition")
+        done <<< "$(printf '%s' "$INPUT_FAIL_ON" | tr '\n' ',' | tr ',' '\n')"
+
+        json="$RUNNER_TEMP/git-judge-commits.json"
+        echo "json=$json" >> "$GITHUB_OUTPUT"
+
+        echo "::group::git-judge-commits ${args[*]}"
+        uvx --from "$package" git-judge-commits "${args[@]}" --json > "$json"
+        status=$?
+        echo "::endgroup::"
+
+        echo "status=$status" >> "$GITHUB_OUTPUT"
+        # Never fail here: the summary is written first, and the real exit comes
+        # after it, so a red build still shows its verdicts.
+        exit 0
+
+    - id: report
+      shell: bash
+      env:
+        JSON: ${{ steps.judge.outputs.json }}
+        STATUS: ${{ steps.judge.outputs.status }}
+        SUMMARY: ${{ inputs.summary }}
+      run: python3 "${{ github.action_path }}/scripts/report.py"

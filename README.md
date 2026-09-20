@@ -200,9 +200,55 @@ fail-on concern=mixed matched 1:
 | `2` | Bad arguments, or git could not do what was asked |
 | `3` | One or more commits could not be judged |
 
+## 🐙 GitHub Action
+
 ```yaml
-- name: no commit lies about itself
-  run: |
+- uses: thejoeejoee/git-judge-commits@v1
+  with:
+    api-key: ${{ secrets.TYPESAFE_API_KEY }}
+    fail-on: message=nok,concern=mixed
+```
+
+That is the whole thing on a `pull_request` event. It judges the commits the request
+adds, writes them to the job summary as a table, and fails the step if anything matches
+`fail-on` — leave that empty to report without ever going red.
+
+**It works with the default `actions/checkout`.** On a pull request the action passes the
+request's *URL* rather than a revision range, so the tool fetches the refs it needs
+itself. No `fetch-depth: 0`, and no surprise when a range turns out to be missing half
+its history in a depth-1 clone.
+
+<details>
+<summary>All inputs and outputs</summary>
+
+| Input | Default | |
+| --- | --- | --- |
+| `api-key` | *required* | A TypeSafe API key |
+| `revisions` | the pull request | A range or a request URL |
+| `fail-on` | *none* | Conditions that fail the step |
+| `min-confidence` | `0.2` | Margin below which an answer is reported as unknown |
+| `threshold` | `0.5` | Probability bar for the yes/no questions |
+| `model` | `typesafe:jev-latest` | Pin a version once tuned |
+| `limit` | `32` | Most commits to judge |
+| `diff-budget` | `16000` | Diff characters per commit |
+| `exclude` | *none* | Pathspecs to drop, comma- or newline-separated |
+| `version` | newest | Which release to run |
+| `source` | PyPI | Install from a path or git URL instead |
+| `summary` | `true` | Write the job summary |
+| `working-directory` | `.` | Where to run |
+
+| Output | |
+| --- | --- |
+| `json` | Path to the verdicts as JSON |
+| `judged` `breaking` `mismatched` `mixed` | Counts, excluding answers too close to call |
+| `failed` | Whether a condition matched |
+
+</details>
+
+Or without the action at all:
+
+```yaml
+- run: |
     uvx git-judge-commits "origin/${{ github.base_ref }}..HEAD" \
       --fail-on=message=nok,concern=mixed
 ```
