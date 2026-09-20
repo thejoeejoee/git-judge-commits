@@ -49,9 +49,12 @@ inputs:
     required: false
     default: ""
   version:
-    description: Which release of git-judge-commits to run. Empty means the newest.
+    description: >-
+      Which release of git-judge-commits to run. Defaults to the one this action
+      was released with, so pinning the action pins the code it runs. Set it
+      empty to take the newest release instead.
     required: false
-    default: ""
+    default: "0.3.0" # x-release-please-version
   source:
     description: >-
       Install from here instead of PyPI: a checkout path, or a git URL such as
@@ -134,6 +137,7 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        HAVE_KEY: ${{ inputs.api-key != '' }}
         GIT_JUDGE_COMMITS_CACHE: ${{ github.workspace }}/.git-judge-commits-cache
         # `gh pr view` supplies the base commit for a pull request URL, and the
         # fetch of a private repository's refs needs it too.
@@ -146,6 +150,15 @@ runs:
         PR_URL: ${{ github.event.pull_request.html_url }}
       run: |
         set -uo pipefail
+
+        # A fork's pull request cannot read the repository's secrets, so the key
+        # arrives empty. Saying so and stopping beats a red build that only ever
+        # means "this was a fork".
+        if [ "$HAVE_KEY" != "true" ]; then
+          echo "::warning::no api-key, skipping. A fork's pull request cannot read repository secrets."
+          echo "skipped=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
 
         if [ -n "$INPUT_SOURCE" ]; then
           package="$INPUT_SOURCE"
@@ -182,7 +195,11 @@ runs:
         echo "json=$json" >> "$GITHUB_OUTPUT"
 
         echo "::group::git-judge-commits ${args[*]}"
-        uvx --from "$package" git-judge-commits "${args[@]}" --verbose --json > "$json"
+        # --refresh-package, because the uv cache carries the package index with
+        # it: a runner that last saw this package before the pinned release
+        # exists will insist that version cannot be found.
+        uvx --refresh-package git-judge-commits --from "$package" \
+          git-judge-commits "${args[@]}" --verbose --json > "$json"
         status=$?
         echo "::endgroup::"
 
@@ -192,6 +209,7 @@ runs:
         exit 0
 
     - id: report
+      if: ${{ steps.judge.outputs.skipped != 'true' }}
       shell: bash
       env:
         JSON: ${{ steps.judge.outputs.json }}
@@ -203,7 +221,7 @@ runs:
       run: python3 "${{ github.action_path }}/scripts/report.py"
 
     - name: comment on the pull request
-      if: ${{ inputs.comment == 'true' && github.event.pull_request.number && steps.report.outputs.comment }}
+      if: ${{ steps.judge.outputs.skipped != 'true' && inputs.comment == 'true' && github.event.pull_request.number && steps.report.outputs.comment }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
