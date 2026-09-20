@@ -54,7 +54,7 @@ inputs:
       was released with, so pinning the action pins the code it runs. Set it
       empty to take the newest release instead.
     required: false
-    default: "0.3.0" # x-release-please-version
+    default: "0.3.1" # x-release-please-version
   source:
     description: >-
       Install from here instead of PyPI: a checkout path, or a git URL such as

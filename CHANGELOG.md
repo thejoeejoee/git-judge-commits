@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.1](https://github.com/thejoeejoee/git-judge-commits/compare/v0.3.0...v0.3.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **action:** actually insert the missing-key guard ([1714c71](https://github.com/thejoeejoee/git-judge-commits/commit/1714c719c142315bcfd29918d468762bee55f309))
+* **action:** pin the package to the action's own release ([a0e963b](https://github.com/thejoeejoee/git-judge-commits/commit/a0e963b7c5f3a35ecadd77a3cc8c581fc0548616))
+* **action:** pin the package to the action's own release ([9f79eab](https://github.com/thejoeejoee/git-judge-commits/commit/9f79eab2fd9d1294c16d1b719f4d2d8480847aec))
+* **action:** refresh the package index before resolving ([3bd1077](https://github.com/thejoeejoee/git-judge-commits/commit/3bd1077fb0b514fa04a9bb55e6c0b010853463f3))
+
+
+### Tests
+
+* **ci:** prove the pin and the fork path instead of assuming them ([b3ea663](https://github.com/thejoeejoee/git-judge-commits/commit/b3ea6635a67b6b1ba7bb39304519667c85998112))
+
 ## [0.3.0](https://github.com/thejoeejoee/git-judge-commits/compare/v0.2.0...v0.3.0) (2026-09-20)
 
 
