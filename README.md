@@ -1,22 +1,32 @@
-# git-judge-commits
+<div align="center">
 
-**Judge every commit in a range and check whether its message tells the truth about its diff.**
+# ⚖️ git-judge-commits
+
+**Judge every commit in a range — and catch the ones whose message lies about the diff.**
+
+[![ci](https://github.com/thejoeejoee/git-judge-commits/actions/workflows/ci.yml/badge.svg)](https://github.com/thejoeejoee/git-judge-commits/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/git-judge-commits?logo=pypi&logoColor=white&color=3775a9)](https://pypi.org/project/git-judge-commits/)
+[![python](https://img.shields.io/pypi/pyversions/git-judge-commits?logo=python&logoColor=white&color=3776ab)](https://pypi.org/project/git-judge-commits/)
+[![powered by Jev](https://img.shields.io/badge/powered%20by-Jev-8b5cf6)](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+<img src="https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/demo.svg" alt="git-judge-commits judging a range of commits" width="900">
+
+</div>
 
 Powered by [**Jev**](https://typesafe.ai/blog/introducing-system-one-models-and-jev), TypeSafe's
 *System One* model. Jev does not write text — it answers **typed questions with calibrated
 probabilities** and nothing else. That is the whole reason this tool works:
 
-- **It cannot hallucinate a field.** Every answer is schema-constrained, so `type` is always
+- 🔒 **It cannot hallucinate a field.** Every answer is schema-constrained, so `type` is always
   one of eleven values and never an invented one.
-- **It tells you when it doesn't know.** Every answer carries a margin, so a question with no
+- 🤔 **It tells you when it doesn't know.** Every answer carries a margin, so a question with no
   clear answer prints `?` instead of a confident guess.
-- **It is fast and nearly free.** Five questions per commit, ~700 ms, at $0.042 per million
+- ⚡ **It is fast and nearly free.** Five questions per commit, ~700 ms, at $0.042 per million
   input tokens with output free — so judging a whole branch costs a fraction of a cent.
 
 A general LLM would write you a paragraph about each commit. Jev gives software something it
 can branch on.
-
-![git-judge-commits judging a range of commits](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/demo.svg)
 
 Five questions per commit, each asked independently against the same state:
 
@@ -44,7 +54,7 @@ directly gave a mean confidence of 0.54 across a 25-commit sample — a coin fli
 same sample scores **0.77 mean / 0.89 median**, with nothing below 0.2. Most real commits
 turn out to be `behaviour`, which is exactly the case a single boolean had no room for.
 
-## Install
+## 📦 Install
 
 ```bash
 uv tool install git-judge-commits
@@ -68,7 +78,7 @@ export TYPESAFE_API_KEY=...
 A `.env` file in the working directory is loaded automatically, so a key kept there is
 picked up without exporting anything.
 
-## Usage
+## 🚀 Usage
 
 ```bash
 git-judge-commits [REVISIONS | PR-URL] [-C PATH]
@@ -86,7 +96,7 @@ git-judge-commits -C ~/src/other-repo    # like git -C
 git-judge-commits --json                 # per-field confidence and rubric scores
 ```
 
-### Judging a pull or merge request
+### 🔗 Judging a pull or merge request
 
 Pass the URL. Nothing needs to be cloned first, and it works from any directory:
 
@@ -129,19 +139,19 @@ The chosen range is always printed before the table, so it is never left implici
 origin/master..HEAD (feat/structured-output) · 1 commit
 ```
 
-### Catching a commit that lies
+### 🕵️ Catching a commit that lies
 
 A commit whose message says `docs: fix typo in comment`, whose diff changes a function's
 behaviour and smuggles in an unrelated helper:
 
-![a commit whose message does not match its diff](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/mismatch.svg)
+![a commit whose message does not match its diff](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/mismatch.svg)
 
 `mismatch` says the message is not a truthful description of the diff, `mixed` says the
 commit does more than one thing, and `5 critical` says look at it before it ships.
 
 Exit code is 2 if git failed, 1 if any commit could not be judged, else 0.
 
-## Confidence and the `?` gate
+## 🎯 Confidence and the `?` gate
 
 Jev's confidence is a **margin from the decision threshold, not a probability of being
 right**: 0 means the question was a coin flip for this commit, 1 means certainty. A
@@ -156,7 +166,7 @@ In `--json`, every answer is reported regardless, with the full per-field `confi
 map, the unrounded `worth_attention` position under `scores`, and a `low_confidence`
 list naming the fields the gate would have hidden.
 
-## Caching
+## ⚡ Caching
 
 Verdicts are cached on disk, so re-running a range costs nothing. A commit is
 immutable and the questions are fixed, so a cached answer is the same answer.
@@ -185,13 +195,13 @@ catches edits made between releases, which a version number alone never would.
 `--min-confidence` is *not* in the key: it only decides what gets printed, so changing
 it re-renders cached verdicts for free.
 
-![a second run spending no tokens](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/cache.svg)
+![a second run spending no tokens](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/cache.svg)
 
 **Staleness.** `jev-latest` and `jev-preview` move when TypeSafe ship a release, which
 a key cannot see, so entries for a moving alias expire after 7 days. Pinned versions
 never expire. `--refresh` re-judges and overwrites; `--no-cache` neither reads nor writes.
 
-## Verbosity
+## 🔍 Verbosity
 
 | Level | Adds |
 | --- | --- |
@@ -204,7 +214,7 @@ never expire. `--refresh` re-judges and overwrites; `--no-cache` neither reads n
 `-vv` is the one to reach for when an answer looks wrong, because it shows what else
 the model had in play:
 
-![per-question margins and probability distributions](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/verbose.svg)
+![per-question margins and probability distributions](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/verbose.svg)
 
 The first commit's `compat` is a five-way split — `behaviour` only just beat `interface`,
 33% to 32% — so its margin is 0.17 and the table prints `?` rather than picking a winner.
@@ -238,7 +248,7 @@ Everything above goes to **stderr**; stdout carries only the table or the JSON. 
 
 Run `git-judge-commits -h` for the full help.
 
-## Design notes
+## 🧩 Design notes
 
 - **One judgement per field.** Jev returns a low margin on questions that bundle several
   factors, so a weak field is a signal the question is badly posed rather than that the
@@ -251,11 +261,11 @@ Run `git-judge-commits -h` for the full help.
 - **Pin the model version** once you have tuned `--threshold` or `--min-confidence`.
   `jev-latest` moves on release and shifts the margins under you.
 
-## Contributing
+## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, how the questions are
 defined, and how to regenerate the screenshots.
 
-## License
+## 📄 License
 
 MIT
