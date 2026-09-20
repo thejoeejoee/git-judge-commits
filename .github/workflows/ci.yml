@@ -76,6 +76,18 @@ jobs:
           print("ok")
           PY
 
+      - name: the action's default version matches the package
+        run: |
+          package=$(uv run --python ${{ matrix.python }} python -c \
+            'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          action=$(grep -oE '"'"'default: "[0-9]+\.[0-9]+\.[0-9]+" # x-release-please-version'"'"' action.yml \
+            | grep -oE '"'"'[0-9]+\.[0-9]+\.[0-9]+'"'"')
+          if [ "$package" != "$action" ]; then
+            echo "::error::action.yml pins $action but the package is $package; release-please did not update it"
+            exit 1
+          fi
+          echo "both $package"
+
       - name: the questions still build a schema
         run: |
           uv run --python ${{ matrix.python }} python -c "
@@ -106,3 +118,13 @@ jobs:
         with:
           name: dist
           path: dist/*
+
+  skips-without-a-key:
+    # The path a fork takes. It has to warn and pass, not fail: a check that is
+    # red whenever the contributor is external is a check people stop reading.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./
+        with:
+          api-key: ""
