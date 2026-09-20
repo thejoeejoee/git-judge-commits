@@ -151,6 +151,15 @@ runs:
       run: |
         set -uo pipefail
 
+        # A fork's pull request cannot read the repository's secrets, so the key
+        # arrives empty. Saying so and stopping beats a red build that only ever
+        # means "this was a fork".
+        if [ "$HAVE_KEY" != "true" ]; then
+          echo "::warning::no api-key, skipping. A fork's pull request cannot read repository secrets."
+          echo "skipped=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
         if [ -n "$INPUT_SOURCE" ]; then
           package="$INPUT_SOURCE"
         elif [ -n "$INPUT_VERSION" ]; then
