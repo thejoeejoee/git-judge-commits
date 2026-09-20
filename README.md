@@ -10,7 +10,7 @@
 [![powered by Jev](https://img.shields.io/badge/powered%20by-Jev-8b5cf6)](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-<img src="https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/demo.svg" alt="git-judge-commits judging a range of commits" width="900">
+<img src="https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/demo.svg" alt="git-judge-commits judging a range of commits" width="900">
 
 </div>
 
@@ -144,7 +144,7 @@ origin/master..HEAD (feat/structured-output) · 1 commit
 A commit whose message says `docs: fix typo in comment`, whose diff changes a function's
 behaviour and smuggles in an unrelated helper:
 
-![a commit whose message does not match its diff](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/mismatch.svg)
+![a commit whose message does not match its diff](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/mismatch.svg)
 
 `mismatch` says the message is not a truthful description of the diff, `mixed` says the
 commit does more than one thing, and `5 critical` says look at it before it ships.
@@ -203,15 +203,33 @@ fail-on concern=mixed matched 1:
 ## 🐙 GitHub Action
 
 ```yaml
-- uses: thejoeejoee/git-judge-commits@v0
-  with:
-    api-key: ${{ secrets.TYPESAFE_API_KEY }}
-    fail-on: message=nok,concern=mixed
+permissions:
+  contents: read
+  pull-requests: write   # so it can post its verdict
+
+steps:
+  - uses: actions/checkout@v7
+  - uses: thejoeejoee/git-judge-commits@v0
+    with:
+      api-key: ${{ secrets.TYPESAFE_API_KEY }}
+      fail-on: message=nok,concern=mixed
 ```
 
 That is the whole thing on a `pull_request` event. It judges the commits the request
-adds, writes them to the job summary as a table, and fails the step if anything matches
-`fail-on` — leave that empty to report without ever going red.
+adds, **comments the verdict on the pull request**, writes the same table to the job
+summary, and fails the step if anything matches `fail-on` — leave that empty to report
+without ever going red.
+
+Verdicts are cached between runs, so a push only pays for the commits it added — the
+cache restores from an earlier run on the same branch, or failing that from the base
+branch's. Re-running a job that has not moved costs nothing at all. Set `cache: false`
+to turn it off.
+
+The comment is edited in place on every push rather than added to, so a busy branch does
+not bury its own review under a stack of them. Set `comment: false` to turn it off, or
+`comment-key` to tell two runs of the action apart. Without `pull-requests: write` the
+step warns instead of failing — which is also what happens on a pull request from a fork,
+where GitHub never grants a writable token.
 
 **It works with the default `actions/checkout`.** On a pull request the action passes the
 request's *URL* rather than a revision range, so the tool fetches the refs it needs
@@ -234,7 +252,10 @@ its history in a depth-1 clone.
 | `exclude` | *none* | Pathspecs to drop, comma- or newline-separated |
 | `version` | newest | Which release to run |
 | `source` | PyPI | Install from a path or git URL instead |
+| `cache` | `true` | Carry the verdict cache between runs |
 | `summary` | `true` | Write the job summary |
+| `comment` | `true` | Post/edit the verdict as a PR comment |
+| `comment-key` | `default` | Distinguishes two runs of the action on one PR |
 | `working-directory` | `.` | Where to run |
 
 | Output | |
@@ -242,6 +263,7 @@ its history in a depth-1 clone.
 | `json` | Path to the verdicts as JSON |
 | `judged` `breaking` `mismatched` `mixed` | Counts, excluding answers too close to call |
 | `failed` | Whether a condition matched |
+| `comment` | Path to the markdown that was posted |
 
 </details>
 
@@ -297,7 +319,7 @@ catches edits made between releases, which a version number alone never would.
 `--min-confidence` is *not* in the key: it only decides what gets printed, so changing
 it re-renders cached verdicts for free.
 
-![a second run spending no tokens](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/cache.svg)
+![a second run spending no tokens](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/cache.svg)
 
 **Staleness.** `jev-latest` and `jev-preview` move when TypeSafe ship a release, which
 a key cannot see, so entries for a moving alias expire after 7 days. Pinned versions
@@ -316,7 +338,7 @@ never expire. `--refresh` re-judges and overwrites; `--no-cache` neither reads n
 `-vv` is the one to reach for when an answer looks wrong, because it shows what else
 the model had in play:
 
-![per-question margins and probability distributions](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/master/docs/verbose.svg)
+![per-question margins and probability distributions](https://raw.githubusercontent.com/thejoeejoee/git-judge-commits/main/docs/verbose.svg)
 
 The first commit's `compat` is a five-way split — `behaviour` only just beat `interface`,
 33% to 32% — so its margin is 0.17 and the table prints `?` rather than picking a winner.

@@ -59,10 +59,29 @@ inputs:
       trying an unreleased change.
     required: false
     default: ""
+  cache:
+    description: >-
+      Carry the verdict cache between runs, so a push only pays for the commits
+      it added. Restores from an earlier run on this branch, or from the base
+      branch's.
+    required: false
+    default: "true"
   summary:
     description: Write the verdicts to the job summary.
     required: false
     default: "true"
+  comment:
+    description: >-
+      Post the verdicts as a pull request comment, editing the previous one
+      rather than adding another. Needs `pull-requests: write`.
+    required: false
+    default: "true"
+  comment-key:
+    description: >-
+      Distinguishes this comment from other runs of the action on the same pull
+      request. Only needed when the action is used more than once.
+    required: false
+    default: default
   working-directory:
     description: Directory to run in.
     required: false
@@ -87,6 +106,9 @@ outputs:
   failed:
     description: Whether a fail-on condition matched.
     value: ${{ steps.report.outputs.failed }}
+  comment:
+    description: Path to the markdown that was posted.
+    value: ${{ steps.report.outputs.comment }}
 
 runs:
   using: composite
@@ -95,11 +117,24 @@ runs:
       with:
         enable-cache: true
 
+    # Every commit in the range is re-judged on every push otherwise, including
+    # the ones that have not moved. The exact key hits when a run is repeated on
+    # the same commit and nothing is written back; a new push falls through to
+    # the prefix, reuses what it can, and saves the rest.
+    - if: ${{ inputs.cache == 'true' }}
+      uses: actions/cache@v6
+      with:
+        path: ${{ github.workspace }}/.git-judge-commits-cache
+        key: git-judge-commits-v1-${{ github.sha }}
+        restore-keys: |
+          git-judge-commits-v1-
+
     - id: judge
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        GIT_JUDGE_COMMITS_CACHE: ${{ github.workspace }}/.git-judge-commits-cache
         # `gh pr view` supplies the base commit for a pull request URL, and the
         # fetch of a private repository's refs needs it too.
         GH_TOKEN: ${{ github.token }}
@@ -147,7 +182,7 @@ runs:
         echo "json=$json" >> "$GITHUB_OUTPUT"
 
         echo "::group::git-judge-commits ${args[*]}"
-        uvx --from "$package" git-judge-commits "${args[@]}" --json > "$json"
+        uvx --from "$package" git-judge-commits "${args[@]}" --verbose --json > "$json"
         status=$?
         echo "::endgroup::"
 
@@ -162,4 +197,33 @@ runs:
         JSON: ${{ steps.judge.outputs.json }}
         STATUS: ${{ steps.judge.outputs.status }}
         SUMMARY: ${{ inputs.summary }}
+        MARKER: <!-- git-judge-commits:${{ inputs.comment-key }} -->
+        # Present only on a pull request, and it changes where each commit links to.
+        PR_NUMBER: ${{ github.event.pull_request.number }}
       run: python3 "${{ github.action_path }}/scripts/report.py"
+
+    - name: comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event.pull_request.number && steps.report.outputs.comment }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        BODY: ${{ steps.report.outputs.comment }}
+        MARKER: <!-- git-judge-commits:${{ inputs.comment-key }} -->
+      run: |
+        set -uo pipefail
+        # Edit the comment from the last run rather than adding another, so a
+        # busy branch does not bury its own review under a stack of them.
+        existing=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+          --jq "[.[] | select(.body | contains(\"$MARKER\")) | .id] | first // empty")
+
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/$GH_REPO/issues/comments/$existing" -F "body=@$BODY" --silent
+        else
+          gh api -X POST "repos/$GH_REPO/issues/$PR/comments" -F "body=@$BODY" --silent
+        fi || {
+          # A fork's token is read-only. That is not a reason to fail the build.
+          echo "::warning::could not post the comment; pull-requests: write is needed (and is never granted to forks)"
+          exit 0
+        }

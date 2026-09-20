@@ -2,13 +2,13 @@ name: release-please
 
 # Versions and the changelog, kept by release-please rather than by hand.
 #
-# Every push to master updates one long-lived pull request: the version bump in
+# Every push to main updates one long-lived pull request: the version bump in
 # pyproject.toml and the CHANGELOG entry assembled from the conventional-commit
 # subjects since the last release. Nothing is published until somebody merges
 # that PR, at which point release-please tags and cuts the GitHub Release.
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:

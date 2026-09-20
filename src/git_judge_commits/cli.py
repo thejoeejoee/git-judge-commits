@@ -347,6 +347,9 @@ def render_json(verdicts: list[Verdict]) -> str:
                 "scores": v.scores,
                 "low_confidence": v.low_confidence,
                 "cached": v.cached,
+                "model": v.model_name,
+                "input_tokens": v.input_tokens,
+                "elapsed_ms": round(v.elapsed * 1000),
             }
         payload.append(entry)
     return json.dumps(payload, indent=2, ensure_ascii=False)
@@ -577,11 +580,14 @@ def judge(
         print(render_json(verdicts))
     else:
         write_table(out, build_table(verdicts, verbose))
-        sys.stdout.flush()  # keep anything that follows in the right order under `2>&1 |`
         if verbose >= 2:
             print_detail(err, verdicts, verbose)
-        err.print()
-        err.print(summarise(verdicts, verbose))
+
+    # stdout carries the result, stderr what happened -- so the summary belongs
+    # here either way. It is the only place the cache reports what it saved.
+    sys.stdout.flush()  # keep what follows in the right order under `2>&1 |`
+    err.print()
+    err.print(summarise(verdicts, verbose))
 
     if tripped := gate.evaluate(conditions, verdicts):
         alarm.print()

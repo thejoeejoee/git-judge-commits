@@ -18,6 +18,24 @@ EXIT_GATE = 1
 EXIT_UNJUDGED = 3
 
 
+def commit_link(sha: str) -> str:
+    """A short sha, linked to the commit.
+
+    GitHub autolinks a bare 40-character sha but not a short one in a code span,
+    and the long form is unreadable in a table -- so link it explicitly. Inside a
+    pull request, point at the commit *in that request*, which is where someone
+    reading this is already standing.
+    """
+    short = f"`{sha[:8]}`"
+    server = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not repository:
+        return short
+    pull_request = os.environ.get("PR_NUMBER")
+    where = f"pull/{pull_request}/commits/{sha}" if pull_request else f"commit/{sha}"
+    return f"[{short}]({server}/{repository}/{where})"
+
+
 def cell(record: dict, field: str, text: str) -> str:
     """A field the gate would have skipped is shown as unknown, not asserted."""
     return "`?`" if field in record.get("low_confidence", []) else text
@@ -26,14 +44,16 @@ def cell(record: dict, field: str, text: str) -> str:
 def table(records: list[dict]) -> list[str]:
     rows = ["| commit | type | compat | attention | concern | message | subject |",
             "| --- | --- | --- | --- | --- | --- | --- |"]
-    for r in records:
+    # git log hands them back newest first, which is right in a terminal. The
+    # Commits tab of a pull request reads oldest first, and this sits next to it.
+    for r in reversed(records):
         if "error" in r:
-            rows.append(f"| `{r['sha'][:8]}` | ❌ | | | | | {r['error']} |")
+            rows.append(f"| {commit_link(r['sha'])} | ❌ | | | | | {r['error']} |")
             continue
         attention = r["worth_attention"]
         rows.append(
-            "| `{sha}` | {type} | {compat} | {attention} | {concern} | {message} | {subject} |".format(
-                sha=r["sha"][:8],
+            "| {sha} | {type} | {compat} | {attention} | {concern} | {message} | {subject} |".format(
+                sha=commit_link(r["sha"]),
                 type=cell(r, "type", r["type"]),
                 compat=cell(r, "compat", f"{COMPAT_MARK.get(r['compat'], '')} {r['compat']}".strip()),
                 attention=cell(r, "worth_attention", f"{ATTENTION_MARK.get(attention, '')} {attention} {r['worth_attention_label']}".strip()),
@@ -43,6 +63,34 @@ def table(records: list[dict]) -> list[str]:
             )
         )
     return rows
+
+
+def thousands(number: int) -> str:
+    return f"{number:,}"
+
+
+def footnote(records: list[dict]) -> str:
+    """The provenance line: which model, what it cost, and what `?` means."""
+    judged = [r for r in records if "error" not in r]
+    model = next((r["model"] for r in judged if r.get("model")), None)
+    spent = sum(r.get("input_tokens", 0) for r in judged if not r.get("cached"))
+    saved = sum(r.get("input_tokens", 0) for r in judged if r.get("cached"))
+    slowest = max((r.get("elapsed_ms", 0) for r in judged if not r.get("cached")), default=0)
+
+    facts = [f"**{len(judged)}** commit{'' if len(judged) == 1 else 's'}"]
+    if model:
+        facts.append(f"`{model}`")
+    if spent or not saved:
+        facts.append(f"{thousands(spent)} input tokens")
+    if saved:
+        facts.append(f"{thousands(saved)} saved by cache")
+    if slowest:
+        facts.append(f"slowest {slowest / 1000:.1f}s")
+
+    return (
+        "<sub>Judged by [Jev](https://typesafe.ai) — <code>?</code> means too close to "
+        "call.<br>" + " · ".join(facts) + "</sub>"
+    )
 
 
 def main() -> int:
@@ -78,14 +126,22 @@ def main() -> int:
     )
     print(headline)
 
+    verdict = "🚩 some commits need another look" if status == EXIT_GATE else "✅ nothing flagged"
+    body = [f"## ⚖️ git-judge-commits", "", f"**{verdict}** — {headline}", ""]
+    body += table(records) if records else ["_No commits in range._"]
+    body += ["", footnote(records)]
+    markdown = "\n".join(body) + "\n"
+
     if os.environ.get("SUMMARY", "true").lower() == "true" and (summary := os.environ.get("GITHUB_STEP_SUMMARY")):
-        verdict = "🚩 some commits need another look" if status == EXIT_GATE else "✅ nothing flagged"
-        lines = [f"## ⚖️ git-judge-commits", "", f"**{verdict}** — {headline}", ""]
-        lines += table(records) if records else ["_No commits in range._"]
-        lines += ["", "<sub>Judged by [Jev](https://typesafe.ai), which answers typed questions with "
-                  "calibrated probabilities. `?` means the answer was too close to call.</sub>"]
         with open(summary, "a") as handle:
-            handle.write("\n".join(lines) + "\n")
+            handle.write(markdown)
+
+    # Written whether or not it gets posted, so the next step only has to decide.
+    if temp := os.environ.get("RUNNER_TEMP"):
+        comment = Path(temp) / "git-judge-commits-comment.md"
+        comment.write_text(f"{os.environ.get('MARKER', '')}\n{markdown}")
+        with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
+            handle.write(f"comment={comment}\n")
 
     if status == EXIT_UNJUDGED:
         print("::warning::some commits could not be judged")
