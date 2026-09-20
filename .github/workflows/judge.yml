@@ -1,0 +1,43 @@
+name: judge
+
+# This repository uses its own action on its own pull requests.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: judge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: secret
+        env:
+          KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: echo "present=${KEY:+true}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      # Forks and a repository without the secret set should skip rather than
+      # go red over a credential they were never going to have.
+      - if: steps.secret.outputs.present == 'true'
+        uses: ./
+        with:
+          api-key: ${{ secrets.TYPESAFE_API_KEY }}
+          # The checkout, not PyPI: this is where the unreleased version lives.
+          source: .
+          exclude: uv.lock
+          # Reported, not enforced: this repository is where the questions get
+          # tuned, so a red build here would mostly be noise.
+          fail-on: ""
+
+      - if: steps.secret.outputs.present != 'true'
+        run: echo "::notice::TYPESAFE_API_KEY is not set, skipping"
+        shell: bash

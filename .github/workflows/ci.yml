@@ -1,0 +1,108 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# Nothing here writes anywhere.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version the package claims to support. StrEnum in model.py is
+        # what puts the floor at 3.11.
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating major tag is published past v6
+        with:
+          enable-cache: true
+
+      - name: install
+        run: uv sync --python ${{ matrix.python }}
+
+      # There is no test suite yet. These checks are what can be asserted
+      # without one, and they are the failures that actually reach users: an
+      # import error, a broken entry point, or a parser that stops recognising
+      # a forge URL.
+      - name: the console script works
+        run: uv run --python ${{ matrix.python }} git-judge-commits --help
+
+      - name: forge URLs still parse
+        run: |
+          uv run --python ${{ matrix.python }} python - <<'PY'
+          from git_judge_commits.forge import parse_url
+          cases = {
+              "https://github.com/django/django/pull/21993": ("github", "django/django", 21993),
+              "https://gitlab.com/g/p/-/merge_requests/5": ("gitlab", "g/p", 5),
+              "https://gitlab.example.com/a/b/c/d/-/merge_requests/42": ("gitlab", "a/b/c/d", 42),
+              "https://codeberg.org/o/r/pulls/12": ("github", "o/r", 12),
+          }
+          for url, expected in cases.items():
+              pr = parse_url(url)
+              assert pr is not None, url
+              assert (pr.forge, pr.project, pr.number) == expected, (url, pr)
+          for plain in ("main..feature", "HEAD~3..", "https://github.com/django/django"):
+              assert parse_url(plain) is None, plain
+          print("ok")
+          PY
+
+      - name: fail-on conditions parse and evaluate
+        run: |
+          uv run --python ${{ matrix.python }} python - <<'PY'
+          from git_judge_commits.gate import Condition, parse
+          for good in ("concern=mixed", "compat=interface,message=nok", "attention>=4",
+                       "compat>=interface", "type=feat|fix", "breaking", "mismatch", "unsure"):
+              assert parse([good]), good
+          assert len(parse(["compat=interface,message=nok"])) == 2
+          for bad in ("nonsense", "compat=nope", "type>=feat", "attention>=9", "compat="):
+              try:
+                  parse([bad])
+              except ValueError:
+                  continue
+              raise AssertionError(f"{bad!r} should not parse")
+          print("ok")
+          PY
+
+      - name: the questions still build a schema
+        run: |
+          uv run --python ${{ matrix.python }} python -c "
+          from git_judge_commits.model import CommitClassification
+          from git_judge_commits.cache import question_fingerprint
+          CommitClassification.model_json_schema()
+          assert len(question_fingerprint()) == 16
+          print('ok')
+          "
+
+  build:
+    # The published artefact is the wheel, so a wheel that breaks is a release
+    # that breaks, and this is where to find that out.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating major tag is published past v6
+
+      - run: uv build
+
+      - name: the wheel installs and runs on its own
+        run: |
+          uv tool install --from ./dist/*.whl git-judge-commits
+          git-judge-commits --help
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
