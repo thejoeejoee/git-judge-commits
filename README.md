@@ -5,8 +5,8 @@
 **Judge every commit in a range — and catch the ones whose message lies about the diff.**
 
 [![ci](https://github.com/thejoeejoee/git-judge-commits/actions/workflows/ci.yml/badge.svg)](https://github.com/thejoeejoee/git-judge-commits/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/git-judge-commits?logo=pypi&logoColor=white&color=3775a9)](https://pypi.org/project/git-judge-commits/)
-[![python](https://img.shields.io/pypi/pyversions/git-judge-commits?logo=python&logoColor=white&color=3776ab)](https://pypi.org/project/git-judge-commits/)
+[![PyPI](https://img.shields.io/pypi/v/git-judge-commits?logo=pypi&logoColor=white&color=3775a9&v1)](https://pypi.org/project/git-judge-commits/)
+[![python](https://img.shields.io/pypi/pyversions/git-judge-commits?logo=python&logoColor=white&color=3776ab&v1)](https://pypi.org/project/git-judge-commits/)
 [![powered by Jev](https://img.shields.io/badge/powered%20by-Jev-8b5cf6)](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
