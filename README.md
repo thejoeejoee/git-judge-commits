@@ -203,7 +203,7 @@ fail-on concern=mixed matched 1:
 ## 🐙 GitHub Action
 
 ```yaml
-- uses: thejoeejoee/git-judge-commits@v1
+- uses: thejoeejoee/git-judge-commits@v0
   with:
     api-key: ${{ secrets.TYPESAFE_API_KEY }}
     fail-on: message=nok,concern=mixed

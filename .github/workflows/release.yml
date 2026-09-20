@@ -75,3 +75,25 @@ jobs:
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  major-tag:
+    # Marketplace consumers pin `@v0`, not `@v0.3.1`, so the floating major tag
+    # has to follow the release. Moved only after PyPI accepted the upload, so
+    # the tag never points at a release that did not happen.
+    needs: [verify, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: move v${{ needs.verify.outputs.version }} major tag
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          major="v${VERSION%%.*}"
+          git tag -f "$major"
+          git push -f origin "refs/tags/$major"

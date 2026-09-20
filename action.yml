@@ -3,7 +3,7 @@ description: Judge every commit in a range and check whether its message tells t
 author: Josef Kolář
 
 branding:
-  icon: check-square
+  icon: git-commit
   color: purple
 
 inputs:
