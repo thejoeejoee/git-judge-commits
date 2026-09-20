@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/thejoeejoee/git-judge-commits/compare/v0.2.0...v0.3.0) (2026-09-20)
+
+
+### Features
+
+* **action:** comment the verdict on the pull request ([314aed3](https://github.com/thejoeejoee/git-judge-commits/commit/314aed30cba9f27822b9c2b6d705cb2833bf9043))
+* **action:** keep the verdict cache between runs ([ffa8259](https://github.com/thejoeejoee/git-judge-commits/commit/ffa8259998f2b7b6f77fd85df21b22ec1a9b5c52))
+* **action:** link each commit in the report ([73182c2](https://github.com/thejoeejoee/git-judge-commits/commit/73182c20018f2796ccc0a89f6ac4a8e1f5715f32))
+* **action:** order the table like the Commits tab, and show what it cost ([64769d4](https://github.com/thejoeejoee/git-judge-commits/commit/64769d4c916fb813f42cf3458c4dc12c4cac84ca))
+
+
+### Documentation
+
+* **action:** shorten the footnote ([32af740](https://github.com/thejoeejoee/git-judge-commits/commit/32af740bdf521e897afab924d5167ca48e394a7b))
+
 ## [0.2.0](https://github.com/thejoeejoee/git-judge-commits/compare/v0.1.0...v0.2.0) (2026-09-20)
 
 
