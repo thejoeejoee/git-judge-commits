@@ -18,6 +18,24 @@ EXIT_GATE = 1
 EXIT_UNJUDGED = 3
 
 
+def commit_link(sha: str) -> str:
+    """A short sha, linked to the commit.
+
+    GitHub autolinks a bare 40-character sha but not a short one in a code span,
+    and the long form is unreadable in a table -- so link it explicitly. Inside a
+    pull request, point at the commit *in that request*, which is where someone
+    reading this is already standing.
+    """
+    short = f"`{sha[:8]}`"
+    server = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not repository:
+        return short
+    pull_request = os.environ.get("PR_NUMBER")
+    where = f"pull/{pull_request}/commits/{sha}" if pull_request else f"commit/{sha}"
+    return f"[{short}]({server}/{repository}/{where})"
+
+
 def cell(record: dict, field: str, text: str) -> str:
     """A field the gate would have skipped is shown as unknown, not asserted."""
     return "`?`" if field in record.get("low_confidence", []) else text
@@ -28,12 +46,12 @@ def table(records: list[dict]) -> list[str]:
             "| --- | --- | --- | --- | --- | --- | --- |"]
     for r in records:
         if "error" in r:
-            rows.append(f"| `{r['sha'][:8]}` | ❌ | | | | | {r['error']} |")
+            rows.append(f"| {commit_link(r['sha'])} | ❌ | | | | | {r['error']} |")
             continue
         attention = r["worth_attention"]
         rows.append(
-            "| `{sha}` | {type} | {compat} | {attention} | {concern} | {message} | {subject} |".format(
-                sha=r["sha"][:8],
+            "| {sha} | {type} | {compat} | {attention} | {concern} | {message} | {subject} |".format(
+                sha=commit_link(r["sha"]),
                 type=cell(r, "type", r["type"]),
                 compat=cell(r, "compat", f"{COMPAT_MARK.get(r['compat'], '')} {r['compat']}".strip()),
                 attention=cell(r, "worth_attention", f"{ATTENTION_MARK.get(attention, '')} {attention} {r['worth_attention_label']}".strip()),

@@ -178,6 +178,8 @@ runs:
         STATUS: ${{ steps.judge.outputs.status }}
         SUMMARY: ${{ inputs.summary }}
         MARKER: <!-- git-judge-commits:${{ inputs.comment-key }} -->
+        # Present only on a pull request, and it changes where each commit links to.
+        PR_NUMBER: ${{ github.event.pull_request.number }}
       run: python3 "${{ github.action_path }}/scripts/report.py"
 
     - name: comment on the pull request
