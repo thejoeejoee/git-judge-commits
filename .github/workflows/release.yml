@@ -28,7 +28,7 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating major tag is published past v6
 
       - run: uv sync
 
