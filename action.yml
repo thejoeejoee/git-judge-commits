@@ -186,7 +186,11 @@ runs:
         echo "json=$json" >> "$GITHUB_OUTPUT"
 
         echo "::group::git-judge-commits ${args[*]}"
-        uvx --from "$package" git-judge-commits "${args[@]}" --verbose --json > "$json"
+        # --refresh-package, because the uv cache carries the package index with
+        # it: a runner that last saw this package before the pinned release
+        # exists will insist that version cannot be found.
+        uvx --refresh-package git-judge-commits --from "$package" \
+          git-judge-commits "${args[@]}" --verbose --json > "$json"
         status=$?
         echo "::endgroup::"
 
