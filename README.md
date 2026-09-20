@@ -220,6 +220,15 @@ adds, **comments the verdict on the pull request**, writes the same table to the
 summary, and fails the step if anything matches `fail-on` — leave that empty to report
 without ever going red.
 
+Pinning the action pins the code it runs: `version` defaults to the release the action
+was cut with, so `@v0.3.0` runs the CLI from `0.3.0` and not whatever PyPI serves today.
+Set `version: ""` if you would rather always take the newest.
+
+Without an `api-key` the action warns and stops instead of failing, because a pull
+request from a fork cannot read repository secrets. Gate the job on
+`github.event.pull_request.head.repo.full_name == github.repository` if you would rather
+it not run at all there.
+
 Verdicts are cached between runs, so a push only pays for the commits it added — the
 cache restores from an earlier run on the same branch, or failing that from the base
 branch's. Re-running a job that has not moved costs nothing at all. Set `cache: false`
@@ -250,7 +259,7 @@ its history in a depth-1 clone.
 | `limit` | `32` | Most commits to judge |
 | `diff-budget` | `16000` | Diff characters per commit |
 | `exclude` | *none* | Pathspecs to drop, comma- or newline-separated |
-| `version` | newest | Which release to run |
+| `version` | the action's own | Which release of the CLI to run; empty takes the newest |
 | `source` | PyPI | Install from a path or git URL instead |
 | `cache` | `true` | Carry the verdict cache between runs |
 | `summary` | `true` | Write the job summary |

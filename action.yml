@@ -49,9 +49,12 @@ inputs:
     required: false
     default: ""
   version:
-    description: Which release of git-judge-commits to run. Empty means the newest.
+    description: >-
+      Which release of git-judge-commits to run. Defaults to the one this action
+      was released with, so pinning the action pins the code it runs. Set it
+      empty to take the newest release instead.
     required: false
-    default: ""
+    default: "0.3.0" # x-release-please-version
   source:
     description: >-
       Install from here instead of PyPI: a checkout path, or a git URL such as
@@ -134,6 +137,7 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        HAVE_KEY: ${{ inputs.api-key != '' }}
         GIT_JUDGE_COMMITS_CACHE: ${{ github.workspace }}/.git-judge-commits-cache
         # `gh pr view` supplies the base commit for a pull request URL, and the
         # fetch of a private repository's refs needs it too.
@@ -192,6 +196,7 @@ runs:
         exit 0
 
     - id: report
+      if: ${{ steps.judge.outputs.skipped != 'true' }}
       shell: bash
       env:
         JSON: ${{ steps.judge.outputs.json }}
@@ -203,7 +208,7 @@ runs:
       run: python3 "${{ github.action_path }}/scripts/report.py"
 
     - name: comment on the pull request
-      if: ${{ inputs.comment == 'true' && github.event.pull_request.number && steps.report.outputs.comment }}
+      if: ${{ steps.judge.outputs.skipped != 'true' && inputs.comment == 'true' && github.event.pull_request.number && steps.report.outputs.comment }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}

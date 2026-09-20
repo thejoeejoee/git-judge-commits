@@ -4,7 +4,15 @@
   "include-v-in-tag": true,
   "include-component-in-tag": false,
   "packages": {
-    ".": {}
+    ".": {
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "action.yml",
+          "jsonpath": "$.inputs.version.default"
+        }
+      ]
+    }
   },
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
